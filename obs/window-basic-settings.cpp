@@ -271,6 +271,9 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->theme, 		     COMBO_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->warnBeforeStreamStart,CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->warnBeforeStreamStop, CHECK_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->hideProjectorCursor,  CHECK_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->recordWhenStreaming,  CHECK_CHANGED,  GENERAL_CHANGED);
+	HookWidget(ui->keepRecordStreamStops,CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->snappingEnabled,      CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->screenSnapping,       CHECK_CHANGED,  GENERAL_CHANGED);
 	HookWidget(ui->centerSnapping,       CHECK_CHANGED,  GENERAL_CHANGED);
@@ -368,6 +371,7 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 	HookWidget(ui->reconnectEnable,      CHECK_CHANGED,  ADV_CHANGED);
 	HookWidget(ui->reconnectRetryDelay,  SCROLL_CHANGED, ADV_CHANGED);
 	HookWidget(ui->reconnectMaxRetries,  SCROLL_CHANGED, ADV_CHANGED);
+	HookWidget(ui->processPriority,      COMBO_CHANGED,  ADV_CHANGED);
 
 #ifdef _WIN32
 	uint32_t winVer = GetWindowsVersion();
@@ -383,15 +387,39 @@ OBSBasicSettings::OBSBasicSettings(QWidget *parent)
 		connect(toggleAero, &QAbstractButton::toggled,
 				this, &OBSBasicSettings::ToggleDisableAero);
 	}
+
+#define PROCESS_PRIORITY(val) \
+	{"Basic.Settings.Advanced.General.ProcessPriority." ## val , val}
+
+	static struct ProcessPriority {
+		const char *name;
+		const char *val;
+	} processPriorities[] = {
+		PROCESS_PRIORITY("High"),
+		PROCESS_PRIORITY("AboveNormal"),
+		PROCESS_PRIORITY("Normal"),
+		PROCESS_PRIORITY("Idle")
+	};
+#undef PROCESS_PRIORITY
+
+	for (ProcessPriority pri : processPriorities)
+		ui->processPriority->addItem(QTStr(pri.name), pri.val);
+
 #else
 	delete ui->rendererLabel;
 	delete ui->renderer;
 	delete ui->adapterLabel;
 	delete ui->adapter;
+	delete ui->processPriorityLabel;
+	delete ui->processPriority;
+	delete ui->advancedGeneralGroupBox;
 	ui->rendererLabel = nullptr;
 	ui->renderer = nullptr;
 	ui->adapterLabel = nullptr;
 	ui->adapter = nullptr;
+	ui->processPriorityLabel = nullptr;
+	ui->processPriority = nullptr;
+	ui->advancedGeneralGroupBox = nullptr;
 #endif
 
 #ifndef __APPLE__
@@ -794,6 +822,14 @@ void OBSBasicSettings::LoadGeneralSettings()
 	LoadLanguageList();
 	LoadThemeList();
 
+	bool recordWhenStreaming = config_get_bool(GetGlobalConfig(),
+			"BasicWindow", "RecordWhenStreaming");
+	ui->recordWhenStreaming->setChecked(recordWhenStreaming);
+
+	bool keepRecordStreamStops = config_get_bool(GetGlobalConfig(),
+			"BasicWindow", "KeepRecordingWhenStreamStops");
+	ui->keepRecordStreamStops->setChecked(keepRecordStreamStops);
+
 	bool snappingEnabled = config_get_bool(GetGlobalConfig(),
 			"BasicWindow", "SnappingEnabled");
 	ui->snappingEnabled->setChecked(snappingEnabled);
@@ -814,7 +850,6 @@ void OBSBasicSettings::LoadGeneralSettings()
 			"BasicWindow", "SnapDistance");
 	ui->snapDistance->setValue(snapDistance);
 
-
 	bool warnBeforeStreamStart = config_get_bool(GetGlobalConfig(),
 			"BasicWindow", "WarnBeforeStartingStream");
 	ui->warnBeforeStreamStart->setChecked(warnBeforeStreamStart);
@@ -822,6 +857,10 @@ void OBSBasicSettings::LoadGeneralSettings()
 	bool warnBeforeStreamStop = config_get_bool(GetGlobalConfig(),
 			"BasicWindow", "WarnBeforeStoppingStream");
 	ui->warnBeforeStreamStop->setChecked(warnBeforeStreamStop);
+
+	bool hideProjectorCursor = config_get_bool(GetGlobalConfig(),
+			"BasicWindow", "HideProjectorCursor");
+	ui->hideProjectorCursor->setChecked(hideProjectorCursor);
 
 	loading = false;
 }
@@ -1803,6 +1842,13 @@ void OBSBasicSettings::LoadAdvancedSettings()
 	ui->disableOSXVSync->setChecked(disableOSXVSync);
 	ui->resetOSXVSync->setChecked(resetOSXVSync);
 	ui->resetOSXVSync->setEnabled(disableOSXVSync);
+#elif _WIN32
+	const char *processPriority = config_get_string(App()->GlobalConfig(),
+			"General", "ProcessPriority");
+	int idx = ui->processPriority->findData(processPriority);
+	if (idx == -1)
+		idx = ui->processPriority->findData("Normal");
+	ui->processPriority->setCurrentIndex(idx);
 #endif
 
 	loading = false;
@@ -2157,6 +2203,19 @@ void OBSBasicSettings::SaveGeneralSettings()
 	config_set_bool(GetGlobalConfig(), "BasicWindow",
 			"WarnBeforeStoppingStream",
 			ui->warnBeforeStreamStop->isChecked());
+
+	config_set_bool(GetGlobalConfig(), "BasicWindow",
+			"HideProjectorCursor",
+			ui->hideProjectorCursor->isChecked());
+
+	if (WidgetChanged(ui->recordWhenStreaming))
+		config_set_bool(GetGlobalConfig(), "BasicWindow",
+				"RecordWhenStreaming",
+				ui->recordWhenStreaming->isChecked());
+	if (WidgetChanged(ui->keepRecordStreamStops))
+		config_set_bool(GetGlobalConfig(), "BasicWindow",
+				"KeepRecordingWhenStreamStops",
+				ui->keepRecordStreamStops->isChecked());
 }
 
 void OBSBasicSettings::SaveStream1Settings()
@@ -2223,6 +2282,13 @@ void OBSBasicSettings::SaveAdvancedSettings()
 	if (WidgetChanged(ui->renderer))
 		config_set_string(App()->GlobalConfig(), "Video", "Renderer",
 				QT_TO_UTF8(ui->renderer->currentText()));
+
+	std::string priority =
+		QT_TO_UTF8(ui->processPriority->currentData().toString());
+	config_set_string(App()->GlobalConfig(), "General", "ProcessPriority",
+			priority.c_str());
+	if (main->Active())
+		SetProcessPriority(priority.c_str());
 #endif
 
 #ifdef __APPLE__
@@ -2853,12 +2919,12 @@ void OBSBasicSettings::on_filenameFormatting_textEdited(const QString &text)
 {
 #ifdef __APPLE__
 	size_t invalidLocation =
-		text.toStdString().find_first_of(":/\\");
+		text.toStdString().find_first_of(":");
 #elif  _WIN32
 	size_t invalidLocation =
-		text.toStdString().find_first_of("<>:\"/\\|?*");
+		text.toStdString().find_first_of("<>:\"|?*");
 #else
-	size_t invalidLocation = text.toStdString().find_first_of("/");
+	size_t invalidLocation = string::npos;
 #endif
 
 	if (invalidLocation != string::npos)
