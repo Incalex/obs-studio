@@ -328,6 +328,8 @@ bool OBSApp::InitGlobalConfigDefaults()
 	config_set_default_string(globalConfig, "General", "Language",
 			DEFAULT_LANG);
 	config_set_default_uint(globalConfig, "General", "MaxLogs", 10);
+	config_set_default_string(globalConfig, "General", "ProcessPriority",
+			"Normal");
 
 #if _WIN32
 	config_set_default_string(globalConfig, "Video", "Renderer",
@@ -354,6 +356,16 @@ bool OBSApp::InitGlobalConfigDefaults()
 			"CenterSnapping", false);
 	config_set_default_double(globalConfig, "BasicWindow",
 			"SnapDistance", 10.0);
+	config_set_default_bool(globalConfig, "BasicWindow",
+			"RecordWhenStreaming", false);
+	config_set_default_bool(globalConfig, "BasicWindow",
+			"KeepRecordingWhenStreamStops", false);
+	config_set_default_bool(globalConfig, "BasicWindow",
+			"ShowTransitions", true);
+	config_set_default_bool(globalConfig, "BasicWindow",
+			"ShowListboxToolbars", true);
+	config_set_default_bool(globalConfig, "BasicWindow",
+			"ShowStatusBar", true);
 
 #ifdef __APPLE__
 	config_set_default_bool(globalConfig, "Video", "DisableOSXVSync", true);
@@ -1422,6 +1434,16 @@ char *GetConfigPathPtr(const char *name)
 	} else {
 		return os_get_config_path_ptr(name);
 	}
+}
+
+int GetProgramDataPath(char *path, size_t size, const char *name)
+{
+	return os_get_program_data_path(path, size, name);
+}
+
+char *GetProgramDataPathPtr(const char *name)
+{
+	return os_get_program_data_path_ptr(name);
 }
 
 bool GetFileSafeName(const char *name, std::string &file)
