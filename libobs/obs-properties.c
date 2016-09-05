@@ -145,6 +145,7 @@ struct obs_properties;
 struct obs_property {
 	const char              *name;
 	const char              *desc;
+	const char              *long_desc;
 	enum obs_property_type  type;
 	bool                    visible;
 	bool                    enabled;
@@ -584,7 +585,8 @@ bool obs_property_button_clicked(obs_property_t *p, void *obj)
 		struct button_data *data = get_type_data(p,
 				OBS_PROPERTY_BUTTON);
 		if (data && data->callback)
-			return data->callback(p->parent, p, context->data);
+			return data->callback(p->parent, p,
+					(context ? context->data : NULL));
 	}
 
 	return false;
@@ -605,6 +607,11 @@ void obs_property_set_description(obs_property_t *p, const char *description)
 	if (p) p->desc = description;
 }
 
+void obs_property_set_long_description(obs_property_t *p, const char *long_desc)
+{
+	if (p) p->long_desc = long_desc;
+}
+
 const char *obs_property_name(obs_property_t *p)
 {
 	return p ? p->name : NULL;
@@ -613,6 +620,11 @@ const char *obs_property_name(obs_property_t *p)
 const char *obs_property_description(obs_property_t *p)
 {
 	return p ? p->desc : NULL;
+}
+
+const char *obs_property_long_description(obs_property_t *p)
+{
+	return p ? p->long_desc : NULL;
 }
 
 enum obs_property_type obs_property_get_type(obs_property_t *p)
