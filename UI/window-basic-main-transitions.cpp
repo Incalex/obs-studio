@@ -220,7 +220,7 @@ obs_source_t *OBSBasic::FindTransition(const char *name)
 	return nullptr;
 }
 
-void OBSBasic::TransitionToScene(obs_scene_t *scene, bool force)
+void OBSBasic::TransitionToScene(OBSScene scene, bool force)
 {
 	obs_source_t *source = obs_scene_get_source(scene);
 	TransitionToScene(source, force);
@@ -234,10 +234,13 @@ void OBSBasic::TransitionStopped()
 			SetCurrentScene(scene);
 	}
 
+	if (api)
+		api->on_event(OBS_FRONTEND_EVENT_TRANSITION_STOPPED);
+
 	swapScene = nullptr;
 }
 
-void OBSBasic::TransitionToScene(obs_source_t *source, bool force)
+void OBSBasic::TransitionToScene(OBSSource source, bool force)
 {
 	obs_scene_t *scene = obs_scene_from_source(source);
 	bool usingPreviewProgram = IsPreviewProgramMode();
@@ -281,6 +284,9 @@ void OBSBasic::TransitionToScene(obs_source_t *source, bool force)
 		obs_scene_release(scene);
 
 	obs_source_release(transition);
+
+	if (api)
+		api->on_event(OBS_FRONTEND_EVENT_SCENE_CHANGED);
 }
 
 static inline void SetComboTransition(QComboBox *combo, obs_source_t *tr)
@@ -293,7 +299,7 @@ static inline void SetComboTransition(QComboBox *combo, obs_source_t *tr)
 	}
 }
 
-void OBSBasic::SetTransition(obs_source_t *transition)
+void OBSBasic::SetTransition(OBSSource transition)
 {
 	obs_source_t *oldTransition = obs_get_output_source(0);
 
@@ -317,6 +323,9 @@ void OBSBasic::SetTransition(obs_source_t *transition)
 	bool configurable = obs_source_configurable(transition);
 	ui->transitionRemove->setEnabled(configurable);
 	ui->transitionProps->setEnabled(configurable);
+
+	if (api)
+		api->on_event(OBS_FRONTEND_EVENT_TRANSITION_CHANGED);
 }
 
 OBSSource OBSBasic::GetCurrentTransition()
@@ -378,6 +387,9 @@ void OBSBasic::AddTransition()
 		ui->transitions->setCurrentIndex(ui->transitions->count() - 1);
 		CreatePropertiesWindow(source);
 		obs_source_release(source);
+
+		if (api)
+			api->on_event(OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED);
 	}
 }
 
@@ -428,6 +440,9 @@ void OBSBasic::on_transitionRemove_clicked()
 	}
 
 	ui->transitions->removeItem(idx);
+
+	if (api)
+		api->on_event(OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED);
 }
 
 void OBSBasic::RenameTransition()
@@ -530,7 +545,7 @@ static T GetOBSRef(QListWidgetItem *item)
 	return item->data(static_cast<int>(QtDataRole::OBSRef)).value<T>();
 }
 
-void OBSBasic::SetCurrentScene(obs_source_t *scene, bool force)
+void OBSBasic::SetCurrentScene(OBSSource scene, bool force)
 {
 	if (!IsPreviewProgramMode()) {
 		TransitionToScene(scene, force);
