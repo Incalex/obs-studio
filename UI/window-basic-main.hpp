@@ -54,6 +54,7 @@ class QNetworkReply;
 #define SIMPLE_ENCODER_X264_LOWCPU             "x264_lowcpu"
 #define SIMPLE_ENCODER_QSV                     "qsv"
 #define SIMPLE_ENCODER_NVENC                   "nvenc"
+#define SIMPLE_ENCODER_AMD                     "amd"
 
 #define PREVIEW_EDGE_SIZE 10
 
@@ -92,6 +93,13 @@ class OBSBasic : public OBSMainWindow {
 		Down,
 		Left,
 		Right
+	};
+
+	enum DropType {
+		DropType_RawText,
+		DropType_Text,
+		DropType_Image,
+		DropType_Media
 	};
 
 private:
@@ -143,13 +151,12 @@ private:
 
 	QPointer<QMenu> startStreamMenu;
 
-	QSystemTrayIcon *trayIcon;
-	QMenu         *trayMenu;
-	QAction       *sysTrayStream;
-	QAction       *sysTrayRecord;
-	QAction       *showHide;
-	QAction       *showPreview;
-	QAction       *exit;
+	QPointer<QSystemTrayIcon> trayIcon;
+	QPointer<QAction>         sysTrayStream;
+	QPointer<QAction>         sysTrayRecord;
+	QPointer<QAction>         showHide;
+	QPointer<QAction>         exit;
+	QPointer<QMenu>           trayMenu;
 	bool          disableHiding = false;
 
 	void          DrawBackdrop(float cx, float cy);
@@ -192,6 +199,8 @@ private:
 	void GetFPSFraction(uint32_t &num, uint32_t &den) const;
 	void GetFPSNanoseconds(uint32_t &num, uint32_t &den) const;
 	void GetConfigFPS(uint32_t &num, uint32_t &den) const;
+
+	void UpdatePreviewScalingMenu();
 
 	void UpdateSources(OBSScene scene);
 	void InsertSceneItem(obs_sceneitem_t *item);
@@ -297,6 +306,12 @@ private:
 
 	inline void OnActivate();
 	inline void OnDeactivate();
+
+	void AddDropSource(const char *file, DropType image);
+	void dragEnterEvent(QDragEnterEvent *event) override;
+	void dragLeaveEvent(QDragLeaveEvent *event) override;
+	void dragMoveEvent(QDragMoveEvent *event) override;
+	void dropEvent(QDropEvent *event) override;
 
 public slots:
 	void StartStreaming();
@@ -500,6 +515,11 @@ private slots:
 	void on_actionMoveToBottom_triggered();
 
 	void on_actionLockPreview_triggered();
+
+	void on_scalingMenu_aboutToShow();
+	void on_actionScaleWindow_triggered();
+	void on_actionScaleCanvas_triggered();
+	void on_actionScaleOutput_triggered();
 
 	void on_streamButton_clicked();
 	void on_recordButton_clicked();
